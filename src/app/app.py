@@ -289,7 +289,7 @@ app.layout = html.Div(
 
                 The app does not require any odds. It works purely on stats.
 
-                You can read more on my github [repo](https://github.com/WarrierRajeev/UFC-Predictions)
+                You can read more on my github [repo](https://github.com/WarrierRajeev/UFC-Scrapers)
 
                 You can read more about me and contact me from my [website](https://rajeevwarrier.com/)
 
