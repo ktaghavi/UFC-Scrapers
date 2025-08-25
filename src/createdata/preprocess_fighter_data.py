@@ -18,10 +18,18 @@ class FighterDetailProcessor:
 
     def _one_hot_encode_win(self):
 
-        self.fights = pd.concat(
-            [self.fights, pd.get_dummies(self.fights["win_by"], prefix="win_by")],
-            axis=1,
-        )
+        win_cols = [
+            "win_by_Decision - Majority",
+            "win_by_Decision - Split",
+            "win_by_Decision - Unanimous",
+            "win_by_KO/TKO",
+            "win_by_Submission",
+            "win_by_TKO - Doctor's Stoppage",
+        ]
+
+        dummies = pd.get_dummies(self.fights["win_by"], prefix="win_by")
+        dummies = dummies.reindex(columns=win_cols, fill_value=0)
+        self.fights = pd.concat([self.fights, dummies], axis=1)
         self.fights.drop(["win_by"], axis=1, inplace=True)
 
     def _get_fighters(self):
