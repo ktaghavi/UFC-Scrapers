@@ -3,18 +3,17 @@ import math
 import os
 import pickle
 
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import requests
-from sklearn.preprocessing import StandardScaler
-from xgboost import XGBClassifier
-
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import search_google.api
 from dash.dependencies import Input, Output, State
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 GOOGLE_API_DEVELOPER_KEY = "enter_key_here"
 CSE_ID = "enter_id_here"
@@ -50,7 +49,7 @@ df_weight_classes = {
 
 
 def normalize(df: pd.DataFrame, scaler) -> pd.DataFrame:
-    df_num = df.select_dtypes(include=[np.float, np.int])
+    df_num = df.select_dtypes(include=[np.number])
     df[list(df_num.columns)] = scaler.transform(df[list(df_num.columns)])
     return df
 
