@@ -3,7 +3,7 @@
 
 ### Usage
 
-![UFC app](https://github.com/WarrierRajeev/UFC-Predictions/blob/master/ufc-app.png)
+![UFC app](https://github.com/WarrierRajeev/UFC-Scrapers/blob/master/ufc-app.png)
 
 - Go to https://ufc-predictions.rajeevwarrier.com/
 - Select weight-class of the bout
@@ -25,7 +25,7 @@
 - Accuracy (valid): 0.7218
 - AUC Score (valid): 0.7763
 
-![Confusion Matrix](https://github.com/WarrierRajeev/UFC-Predictions/blob/master/conf-matrix.png)
+![Confusion Matrix](https://github.com/WarrierRajeev/UFC-Scrapers/blob/master/conf-matrix.png)
 
 - `0` corresponds to **Blue**: Fighter in the blue corner
 - `1` corresponds to **Red**: Fighter in the red corner
@@ -41,7 +41,7 @@ This is a list of every UFC fight in the history of the organisation. Every row 
 
 ### How to use from scratch?
 
-- From the root, i.e., `UFC-Predictions`, simply run `python -m src.create_ufc_data`
+- From the root, i.e., `UFC-Scrapers`, simply run `python -m src.create_ufc_data`
 
 (Note: This will scrape everything from the beginning if you haven't used this before.
 Otherwise the command will update the data files. Then, it will preprocess the raw scraped files to create usable data files)
