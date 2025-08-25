@@ -111,12 +111,32 @@ class Preprocessor:
         attempt_suffix = "_att"
         landed_suffix = "_landed"
 
+        def _extract_attempts(value):
+            if isinstance(value, str) and "of" in value:
+                try:
+                    return int(value.split("of")[1])
+                except (IndexError, ValueError):
+                    return 0
+            if pd.isna(value):
+                return 0
+            return int(value)
+
+        def _extract_landed(value):
+            if isinstance(value, str) and "of" in value:
+                try:
+                    return int(value.split("of")[0])
+                except (IndexError, ValueError):
+                    return 0
+            if pd.isna(value):
+                return 0
+            return int(value)
+
         for column in columns:
             self.fights[column + attempt_suffix] = self.fights[column].apply(
-                lambda X: int(X.split("of")[1])
+                _extract_attempts
             )
             self.fights[column + landed_suffix] = self.fights[column].apply(
-                lambda X: int(X.split("of")[0])
+                _extract_landed
             )
 
         self.fights.drop(columns, axis=1, inplace=True)
