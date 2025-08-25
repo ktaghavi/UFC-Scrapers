@@ -148,12 +148,38 @@ class Preprocessor:
         pct_columns = ["R_SIG_STR_pct", "B_SIG_STR_pct", "R_TD_pct", "B_TD_pct"]
 
         def pct_to_frac(X):
-            if X != "---":
-                return float(X.replace("%", "")) / 100
-            else:
-                # if '---' means it's taking pct of `0 of 0`.
-                # Taking a call here to consider 0 landed of 0 attempted as 0 percentage
+            """Convert percentage strings to float fractions.
+
+            The raw scraped data sometimes contains percentage values as strings
+            like ``"45%"`` but in other cases the values may already be stored as
+            numeric types (``float``/``int``) or as the placeholder ``"---"``. The
+            previous implementation blindly called ``str.replace`` which raised an
+            :class:`AttributeError` when a non-string value was encountered.  This
+            helper is now defensive and handles the following cases:
+
+            * ``NaN`` or ``"---"`` -> return ``0`` as no attempts were made.
+            * string percentages -> strip ``"%"`` and divide by 100.
+            * numeric values -> if greater than ``1`` assume the value is still a
+              percentage and divide by 100, otherwise treat it as an already
+              converted fraction.
+            """
+
+            if pd.isna(X) or X == "---":
+                # '---' means it's taking pct of `0 of 0`. Consider this as 0.
                 return 0
+
+            if isinstance(X, str):
+                try:
+                    X = float(X.replace("%", ""))
+                except ValueError:
+                    return 0
+            else:
+                try:
+                    X = float(X)
+                except (TypeError, ValueError):
+                    return 0
+
+            return X / 100 if X > 1 else X
 
         for column in pct_columns:
             self.fights[column] = self.fights[column].apply(pct_to_frac)
