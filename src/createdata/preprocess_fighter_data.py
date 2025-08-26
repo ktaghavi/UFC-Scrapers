@@ -140,11 +140,18 @@ class FighterDetailProcessor:
             for i, index in enumerate(fighter.index):
 
                 fighter_slice = fighter[(i + 1) :].sort_index(ascending=False)
+                # Ensure numerical columns are of numeric dtype before applying
+                # exponential weighted calculations. Some older records may
+                # contain fighter names or other strings which cause pandas to
+                # raise a ``DataError`` when attempting to aggregate. By
+                # coercing errors to ``NaN`` we safely ignore those values and
+                # allow the moving averages to be computed on the remaining
+                # numeric data.
+                numeric_slice = fighter_slice[Numerical_columns].apply(
+                    pd.to_numeric, errors="coerce"
+                )
                 s = (
-                    fighter_slice[Numerical_columns]
-                    .ewm(span=3, adjust=False)
-                    .mean()
-                    .tail(1)
+                    numeric_slice.ewm(span=3, adjust=False).mean().tail(1)
                 )
                 if len(s) != 0:
                     pass
