@@ -90,17 +90,22 @@ class FightDataScraper:
             fight_details = FightDataScraper._get_fight_details(fight_soup)
             result_data = FightDataScraper._get_fight_result_data(fight_soup)
             total_fight_stats = (
-                    fight_stats
-                    + ";"
-                    + fight_details
-                    + ";"
-                    + event_info
-                    + ";"
-                    + result_data
+                fight_stats
+                + ";"
+                + fight_details
+                + ";"
+                + event_info
+                + ";"
+                + result_data
             )
-        except Exception as e:
-            pass
-            #print("Error getting fight stats, " + str(e))
+        except Exception as e:  # pragma: no cover - network errors are non-deterministic
+            # Previously any exception was silently swallowed which made debugging
+            # scraping issues extremely difficult and resulted in rows missing
+            # fighter information.  Logging the URL and the exception gives us
+            # visibility into failures while still allowing the scraper to
+            # continue processing other fights.
+            print(f"Error getting fight stats for {fight}: {e}")
+            total_fight_stats = ""
 
         return total_fight_stats
 
@@ -135,10 +140,25 @@ class FightDataScraper:
     @classmethod
     def _get_fight_stats(cls, fight_soup: BeautifulSoup) -> str:
         tables = fight_soup.findAll("tbody")
+
+        # The UFC statistics page contains multiple tables; historically the
+        # totals were stored in the first and third ``tbody`` elements.  The
+        # layout of the site changes from time to time so we defensively check
+        # that the expected tables actually exist.  If not, raise an informative
+        # error so the caller can handle or log the issue instead of returning
+        # malformed data.
+        if len(tables) < 3:
+            raise ValueError(
+                f"Expected at least 3 <tbody> elements in fight page, found {len(tables)}"
+            )
+
         total_fight_data = [tables[0], tables[2]]
         fight_stats = []
         for table in total_fight_data:
             row = table.find("tr")
+            if row is None:
+                raise ValueError("Could not find table row containing fight stats")
+
             stats = ""
             for data in row.findAll("td"):
                 if stats == "":

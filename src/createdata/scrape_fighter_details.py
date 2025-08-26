@@ -104,34 +104,40 @@ class FighterDetailsScraper:
         return new_fighter_links, all_fighter_links
 
     def _get_fighter_data_task(self, fighter_name, fighter_url):
-        another_soup = make_soup(fighter_url)
-        divs = another_soup.findAll(
-            "li",
-            {"class": "b-list__box-list-item b-list__box-list-item_type_block"},
-        )
-        data = []
-        for i, div in enumerate(divs):
-            if i == 9:
-                # An empty string is scraped here, let's not append that
-                continue
-            data.append(
-                div.text.replace("  ", "")
-                    .replace("\n", "")
-                    .replace("Height:", "")
-                    .replace("Weight:", "")
-                    .replace("Reach:", "")
-                    .replace("STANCE:", "")
-                    .replace("DOB:", "")
-                    .replace("SLpM:", "")
-                    .replace("Str. Acc.:", "")
-                    .replace("SApM:", "")
-                    .replace("Str. Def:", "")
-                    .replace("TD Avg.:", "")
-                    .replace("TD Acc.:", "")
-                    .replace("TD Def.:", "")
-                    .replace("Sub. Avg.:", "")
+        try:
+            another_soup = make_soup(fighter_url)
+            divs = another_soup.findAll(
+                "li",
+                {"class": "b-list__box-list-item b-list__box-list-item_type_block"},
             )
-        return fighter_name, data
+            data = []
+            for i, div in enumerate(divs):
+                if i == 9:
+                    # An empty string is scraped here, let's not append that
+                    continue
+                data.append(
+                    div.text.replace("  ", "")
+                        .replace("\n", "")
+                        .replace("Height:", "")
+                        .replace("Weight:", "")
+                        .replace("Reach:", "")
+                        .replace("STANCE:", "")
+                        .replace("DOB:", "")
+                        .replace("SLpM:", "")
+                        .replace("Str. Acc.:", "")
+                        .replace("SApM:", "")
+                        .replace("Str. Def:", "")
+                        .replace("TD Avg.:", "")
+                        .replace("TD Acc.:", "")
+                        .replace("TD Def.:", "")
+                        .replace("Sub. Avg.:", "")
+                )
+            return fighter_name, data
+        except Exception as e:  # pragma: no cover - network errors are flaky
+            # Log the error so that the calling code can skip this fighter but we
+            # still get visibility into what went wrong.
+            print(f"Error scraping fighter data for {fighter_name} ({fighter_url}): {e}")
+            return fighter_name, []
 
     def _get_fighter_name_and_details(
             self, fighter_name_and_link: Dict[str, List[str]]
