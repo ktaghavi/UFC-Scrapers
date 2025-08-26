@@ -185,12 +185,26 @@ class Preprocessor:
             self.fights[column] = self.fights[column].apply(pct_to_frac)
 
     def _create_title_bout_feature(self):
-        self.fights["title_bout"] = self.fights["Fight_type"].apply(
-            lambda X: True if "Title Bout" in X else False
-        )
+        def is_title_bout(fight_type):
+            """Return ``True`` if the bout was for a title.
+
+            Some rows in ``Fight_type`` are missing and are represented as ``NaN``
+            (``float``).  The previous implementation attempted to check for the
+            substring ``"Title Bout"`` without verifying the value was a string,
+            which raised a ``TypeError`` when ``fight_type`` was a ``float``.  This
+            helper defensively ensures we only search strings.
+            """
+
+            return isinstance(fight_type, str) and "Title Bout" in fight_type
+
+        self.fights["title_bout"] = self.fights["Fight_type"].apply(is_title_bout)
 
     def _create_weight_classes(self):
         def make_weight_class(X):
+            if not isinstance(X, str):
+                # When the fight type is missing treat it as an open-weight bout.
+                return "Open Weight"
+
             weight_classes = [
                 "Women's Strawweight",
                 "Women's Bantamweight",
@@ -211,7 +225,7 @@ class Preprocessor:
                 if weight_class in X:
                     return weight_class
 
-            if X == "Catch Weight Bout" or "Catchweight Bout":
+            if X in ["Catch Weight Bout", "Catchweight Bout"]:
                 return "Catch Weight"
             else:
                 return "Open Weight"
@@ -431,10 +445,14 @@ class Preprocessor:
 
         # Select numeric columns (excluding the 'total_time_fought(seconds)' column)
         numeric_columns = self.store.select_dtypes(include=np.number).columns
-        numeric_columns = numeric_columns[numeric_columns != 'total_time_fought(seconds)']
+        numeric_columns = numeric_columns[
+            numeric_columns != "total_time_fought(seconds)"
+        ]
 
         # Fill NaN values for numeric columns using median
-        self.store[numeric_columns] = self.store[numeric_columns].fillna(self.store[numeric_columns].median())
+        self.store[numeric_columns] = self.store[numeric_columns].fillna(
+            self.store[numeric_columns].median()
+        )
 
         self.store["R_Stance"].fillna("Orthodox", inplace=True)
         self.store["B_Stance"].fillna("Orthodox", inplace=True)
