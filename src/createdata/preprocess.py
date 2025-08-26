@@ -254,21 +254,58 @@ class Preprocessor:
         )
 
     def _convert_last_round_to_seconds(self):
-        # Converting to seconds
+        """Convert ``last_round_time`` strings into total seconds.
+
+        The scraped data occasionally contains missing values (``NaN``) or the
+        placeholder ``"--"``.  Previously the implementation unconditionally
+        called ``split`` which raised an :class:`AttributeError` when the value
+        wasn't a string.  This helper defensively handles those edge cases and
+        returns ``0`` when the time is unavailable.
+        """
+
+        def to_seconds(value):
+            if pd.isna(value) or value == "--":
+                return 0
+
+            if isinstance(value, str) and ":" in value:
+                mins, secs = value.split(":", 1)
+                try:
+                    return int(mins) * 60 + int(secs)
+                except (TypeError, ValueError):
+                    return 0
+
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return 0
+
         self.fights["last_round_time"] = self.fights["last_round_time"].apply(
-            lambda X: int(X.split(":")[0]) * 60 + int(X.split(":")[1])
+            to_seconds
         )
 
     def _convert_CTRL_to_seconds(self):
-        # Converting to seconds
+        """Convert control time columns (``R_CTRL``/``B_CTRL``) to seconds.
+
+        Values may be missing, represented by ``NaN``/``"--"`` or already be
+        numeric.  Any unparsable value is treated as ``0``.
+        """
+
         CTRL_columns = ["R_CTRL", "B_CTRL"]
 
-        def conv_to_sec(X):
-            if X != "--":
-                return int(X.split(":")[0]) * 60 + int(X.split(":")[1])
-            else:
-                # if '--' means there was no time spent on the ground.
-                # Taking a call here to consider this as 0 seconds
+        def conv_to_sec(value):
+            if pd.isna(value) or value == "--":
+                return 0
+
+            if isinstance(value, str) and ":" in value:
+                mins, secs = value.split(":", 1)
+                try:
+                    return int(mins) * 60 + int(secs)
+                except (TypeError, ValueError):
+                    return 0
+
+            try:
+                return int(value)
+            except (TypeError, ValueError):
                 return 0
 
         for column in CTRL_columns:
