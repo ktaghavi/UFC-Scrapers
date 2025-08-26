@@ -212,8 +212,8 @@ class FighterDetailsScraper:
                 self.FIGHTER_DETAILS_PATH, index_col="fighter_name"
             )
 
-            fighter_details_df = pd.concat(
-                [new_fighter_details_df, old_fighter_details_df], ignore_index=False
+            fighter_details_df = new_fighter_details_df.append(
+                old_fighter_details_df, ignore_index=False
             )
 
         fighter_details_df.to_csv(self.FIGHTER_DETAILS_PATH, index_label="fighter_name")

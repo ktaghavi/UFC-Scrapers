@@ -3,7 +3,7 @@
 
 ### Usage
 
-![UFC app](https://github.com/WarrierRajeev/UFC-Scrapers/blob/master/ufc-app.png)
+![UFC app](https://github.com/WarrierRajeev/UFC-Predictions/blob/master/ufc-app.png)
 
 - Go to https://ufc-predictions.rajeevwarrier.com/
 - Select weight-class of the bout
@@ -25,7 +25,7 @@
 - Accuracy (valid): 0.7218
 - AUC Score (valid): 0.7763
 
-![Confusion Matrix](https://github.com/WarrierRajeev/UFC-Scrapers/blob/master/conf-matrix.png)
+![Confusion Matrix](https://github.com/WarrierRajeev/UFC-Predictions/blob/master/conf-matrix.png)
 
 - `0` corresponds to **Blue**: Fighter in the blue corner
 - `1` corresponds to **Red**: Fighter in the red corner
@@ -37,37 +37,37 @@
 
 #### Context
 
-This is a list of every UFC fight in the history of the organisation. Every row contains information about both fighters, fight details and the winner. The data was scraped from UFCStats website. After FightMetric ceased to exist, this came into picture. I saw that there was a lot of information on the website about every fight and every event and there were no existing ways of capturing all this. I used BeautifulSoup to scrape the data and pandas to process it. It was a long and arduous process, please forgive any mistakes. I have provided the raw files in case anybody wants to process it differently. This is my first time creating a dataset, any suggestions and corrections are welcome!
+This is a list of every UFC fight in the history of the organisation. Every row contains information about both fighters, fight details and the winner. The data was scraped from ufcstats website. After fightmetric ceased to exist, this came into picture. I saw that there was a lot of information on the website about every fight and every event and there were no existing ways of capturing all this. I used beautifulsoup to scrape the data and pandas to process it. It was a long and arduous process, please forgive any mistakes. I have provided the raw files incase anybody wants to process it differently. This is my first time creating a dataset, any suggestions and corrections are welcome!
 
-### How to use from scratch?
+### How to use from Scratch?
 
-- From the root, i.e., `UFC-Scrapers`, simply run `python -m src.create_ufc_data`
+- From the root i.e. `UFC-Predictions`, Simply run `python -m src.create_ufc_data`
 
 (Note: This will scrape everything from the beginning if you haven't used this before.
 Otherwise the command will update the data files. Then, it will preprocess the raw scraped files to create usable data files)
 
 #### Content
 
-Each row is a compilation of both fighter stats. Fighters are represented by 'red' and 'blue' (for red and blue corner). So for instance, red fighter has the compiled average stats of all the fights except the current one. The stats include damage done by the red fighter on the opponent and the damage done by the opponent on the fighter (represented by 'opp' in the columns) in all the fights this particular red fighter has had, except this one as it has not occurred yet (in the data). Same information exists for blue fighter. The target variable is 'Winner' which is the only column that tells you what happened.
+Each row is a compilation of both fighter stats. Fighters are represented by 'red' and 'blue' (for red and blue corner). So for instance, red fighter has the complied average stats of all the fights except the current one. The stats include damage done by the red fighter on the opponent and the damage done by the opponent on the fighter (represented by 'opp' in the columns) in all the fights this particular red fighter has had, except this one as it has not occured yet (in the data). Same information exists for blue fighter. The target variable is 'Winner' which is the only column that tells you what happened.
 Here are some column definitions:
 
 #### Column definitions:
 
-- `R_` and `B_` prefixes signify red and blue corner fighter stats respectively
+- `R_` and `B_` prefix signifies red and blue corner fighter stats respectively
 - `_opp_` containing columns is the average of damage done by the opponent on the fighter
 - `KD` is number of knockdowns
-- `SIG_STR` is no. of significant strikes 'landed or attempted'
+- `SIG_STR` is no. of significant strikes 'landed of attempted'
 - `SIG_STR_pct` is significant strikes percentage
-- `TOTAL_STR` is total strikes 'landed or attempted'
+- `TOTAL_STR` is total strikes 'landed of attempted'
 - `TD` is no. of takedowns
-- `TD_pct` is takedown percentage
+- `TD_pct` is takedown percentages
 - `SUB_ATT` is no. of submission attempts
-- `PASS` is no. of times the guard was passed
+- `PASS` is no. times the guard was passed?
 - `REV` are the number of reversals
-- `HEAD` is no. of significant strikes to the head 'landed or attempted'
-- `BODY` is no. of significant strikes to the body 'landed or attempted'
-- `CLINCH` is no. of significant strikes in the clinch 'landed or attempted'
-- `GROUND` is no. of significant strikes on the ground 'landed or attempted'
+- `HEAD` is no. of significant strinks to the head 'landed of attempted'
+- `BODY` is no. of significant strikes to the body 'landed of attempted'
+- `CLINCH` is no. of significant strikes in the clinch 'landed of attempted'
+- `GROUND` is no. of significant strikes on the ground 'landed of attempted'
 - `win_by` is method of win
 - `last_round` is last round of the fight (ex. if it was a KO in 1st, then this will be 1)
 - `last_round_time` is when the fight ended in the last round

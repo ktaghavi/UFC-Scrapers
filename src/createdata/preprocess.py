@@ -111,32 +111,12 @@ class Preprocessor:
         attempt_suffix = "_att"
         landed_suffix = "_landed"
 
-        def _extract_attempts(value):
-            if isinstance(value, str) and "of" in value:
-                try:
-                    return int(value.split("of")[1])
-                except (IndexError, ValueError):
-                    return 0
-            if pd.isna(value):
-                return 0
-            return int(value)
-
-        def _extract_landed(value):
-            if isinstance(value, str) and "of" in value:
-                try:
-                    return int(value.split("of")[0])
-                except (IndexError, ValueError):
-                    return 0
-            if pd.isna(value):
-                return 0
-            return int(value)
-
         for column in columns:
             self.fights[column + attempt_suffix] = self.fights[column].apply(
-                _extract_attempts
+                lambda X: int(X.split("of")[1])
             )
             self.fights[column + landed_suffix] = self.fights[column].apply(
-                _extract_landed
+                lambda X: int(X.split("of")[0])
             )
 
         self.fights.drop(columns, axis=1, inplace=True)
@@ -148,63 +128,23 @@ class Preprocessor:
         pct_columns = ["R_SIG_STR_pct", "B_SIG_STR_pct", "R_TD_pct", "B_TD_pct"]
 
         def pct_to_frac(X):
-            """Convert percentage strings to float fractions.
-
-            The raw scraped data sometimes contains percentage values as strings
-            like ``"45%"`` but in other cases the values may already be stored as
-            numeric types (``float``/``int``) or as the placeholder ``"---"``. The
-            previous implementation blindly called ``str.replace`` which raised an
-            :class:`AttributeError` when a non-string value was encountered.  This
-            helper is now defensive and handles the following cases:
-
-            * ``NaN`` or ``"---"`` -> return ``0`` as no attempts were made.
-            * string percentages -> strip ``"%"`` and divide by 100.
-            * numeric values -> if greater than ``1`` assume the value is still a
-              percentage and divide by 100, otherwise treat it as an already
-              converted fraction.
-            """
-
-            if pd.isna(X) or X == "---":
-                # '---' means it's taking pct of `0 of 0`. Consider this as 0.
-                return 0
-
-            if isinstance(X, str):
-                try:
-                    X = float(X.replace("%", ""))
-                except ValueError:
-                    return 0
+            if X != "---":
+                return float(X.replace("%", "")) / 100
             else:
-                try:
-                    X = float(X)
-                except (TypeError, ValueError):
-                    return 0
-
-            return X / 100 if X > 1 else X
+                # if '---' means it's taking pct of `0 of 0`.
+                # Taking a call here to consider 0 landed of 0 attempted as 0 percentage
+                return 0
 
         for column in pct_columns:
             self.fights[column] = self.fights[column].apply(pct_to_frac)
 
     def _create_title_bout_feature(self):
-        def is_title_bout(fight_type):
-            """Return ``True`` if the bout was for a title.
-
-            Some rows in ``Fight_type`` are missing and are represented as ``NaN``
-            (``float``).  The previous implementation attempted to check for the
-            substring ``"Title Bout"`` without verifying the value was a string,
-            which raised a ``TypeError`` when ``fight_type`` was a ``float``.  This
-            helper defensively ensures we only search strings.
-            """
-
-            return isinstance(fight_type, str) and "Title Bout" in fight_type
-
-        self.fights["title_bout"] = self.fights["Fight_type"].apply(is_title_bout)
+        self.fights["title_bout"] = self.fights["Fight_type"].apply(
+            lambda X: True if "Title Bout" in X else False
+        )
 
     def _create_weight_classes(self):
         def make_weight_class(X):
-            if not isinstance(X, str):
-                # When the fight type is missing treat it as an open-weight bout.
-                return "Open Weight"
-
             weight_classes = [
                 "Women's Strawweight",
                 "Women's Bantamweight",
@@ -225,7 +165,7 @@ class Preprocessor:
                 if weight_class in X:
                     return weight_class
 
-            if X in ["Catch Weight Bout", "Catchweight Bout"]:
+            if X == "Catch Weight Bout" or "Catchweight Bout":
                 return "Catch Weight"
             else:
                 return "Open Weight"
@@ -254,58 +194,21 @@ class Preprocessor:
         )
 
     def _convert_last_round_to_seconds(self):
-        """Convert ``last_round_time`` strings into total seconds.
-
-        The scraped data occasionally contains missing values (``NaN``) or the
-        placeholder ``"--"``.  Previously the implementation unconditionally
-        called ``split`` which raised an :class:`AttributeError` when the value
-        wasn't a string.  This helper defensively handles those edge cases and
-        returns ``0`` when the time is unavailable.
-        """
-
-        def to_seconds(value):
-            if pd.isna(value) or value == "--":
-                return 0
-
-            if isinstance(value, str) and ":" in value:
-                mins, secs = value.split(":", 1)
-                try:
-                    return int(mins) * 60 + int(secs)
-                except (TypeError, ValueError):
-                    return 0
-
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                return 0
-
+        # Converting to seconds
         self.fights["last_round_time"] = self.fights["last_round_time"].apply(
-            to_seconds
+            lambda X: int(X.split(":")[0]) * 60 + int(X.split(":")[1])
         )
 
     def _convert_CTRL_to_seconds(self):
-        """Convert control time columns (``R_CTRL``/``B_CTRL``) to seconds.
-
-        Values may be missing, represented by ``NaN``/``"--"`` or already be
-        numeric.  Any unparsable value is treated as ``0``.
-        """
-
+        # Converting to seconds
         CTRL_columns = ["R_CTRL", "B_CTRL"]
 
-        def conv_to_sec(value):
-            if pd.isna(value) or value == "--":
-                return 0
-
-            if isinstance(value, str) and ":" in value:
-                mins, secs = value.split(":", 1)
-                try:
-                    return int(mins) * 60 + int(secs)
-                except (TypeError, ValueError):
-                    return 0
-
-            try:
-                return int(value)
-            except (TypeError, ValueError):
+        def conv_to_sec(X):
+            if X != "--":
+                return int(X.split(":")[0]) * 60 + int(X.split(":")[1])
+            else:
+                # if '--' means there was no time spent on the ground.
+                # Taking a call here to consider this as 0 seconds
                 return 0
 
         for column in CTRL_columns:
@@ -482,14 +385,10 @@ class Preprocessor:
 
         # Select numeric columns (excluding the 'total_time_fought(seconds)' column)
         numeric_columns = self.store.select_dtypes(include=np.number).columns
-        numeric_columns = numeric_columns[
-            numeric_columns != "total_time_fought(seconds)"
-        ]
+        numeric_columns = numeric_columns[numeric_columns != 'total_time_fought(seconds)']
 
         # Fill NaN values for numeric columns using median
-        self.store[numeric_columns] = self.store[numeric_columns].fillna(
-            self.store[numeric_columns].median()
-        )
+        self.store[numeric_columns] = self.store[numeric_columns].fillna(self.store[numeric_columns].median())
 
         self.store["R_Stance"].fillna("Orthodox", inplace=True)
         self.store["B_Stance"].fillna("Orthodox", inplace=True)

@@ -3,17 +3,18 @@ import math
 import os
 import pickle
 
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import requests
-import search_google.api
-from dash.dependencies import Input, Output, State
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
+
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import search_google.api
+from dash.dependencies import Input, Output, State
 
 GOOGLE_API_DEVELOPER_KEY = "enter_key_here"
 CSE_ID = "enter_id_here"
@@ -44,11 +45,12 @@ df_weight_classes = {
     "Women's Bantamweight": "weight_class_Women_Bantamweight",
     "Women's Featherweight": "weight_class_Women_Featherweight",
     "Catch Weight": "weight_class_CatchWeight",
+    "Open Weight": "weight_class_OpenWeight",
 }
 
 
 def normalize(df: pd.DataFrame, scaler) -> pd.DataFrame:
-    df_num = df.select_dtypes(include=[np.number])
+    df_num = df.select_dtypes(include=[np.float, np.int])
     df[list(df_num.columns)] = scaler.transform(df[list(df_num.columns)])
     return df
 
@@ -288,7 +290,7 @@ app.layout = html.Div(
 
                 The app does not require any odds. It works purely on stats.
 
-                You can read more on my github [repo](https://github.com/WarrierRajeev/UFC-Scrapers)
+                You can read more on my github [repo](https://github.com/WarrierRajeev/UFC-Predictions)
 
                 You can read more about me and contact me from my [website](https://rajeevwarrier.com/)
 
