@@ -4,10 +4,49 @@ import requests
 from bs4 import BeautifulSoup
 
 
+# Re-use a single ``requests`` session so we get connection pooling and can also
+# configure retries in one place.  Some of the UFC endpoints occasionally return
+# transient ``403``/``5xx`` responses or redirect to the HTTPS version of the
+# site.  The previous implementation made a bare ``requests.get`` call without
+# any headers and with redirects disabled which resulted in downloading the
+# intermediate/forbidden page.  Parsing those pages produced empty or garbled
+# data (missing fighter names, stats, etc.).
+
+
+# ``Session`` gives us a convenient place to set a User-Agent header that more
+# closely resembles a real browser and to enable automatic redirects.  This
+# dramatically increases the success rate of requests to ``ufcstats.com``.
+_session = requests.Session()
+_session.headers.update(
+    {
+        # A generic but commonly accepted desktop user agent string
+        "User-Agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
+    }
+)
+
+
 def make_soup(url: str) -> BeautifulSoup:
-    source_code = requests.get(url, allow_redirects=False)
-    plain_text = source_code.text.encode("ascii", "replace")
-    return BeautifulSoup(plain_text, "html.parser")
+    """Return a :class:`~bs4.BeautifulSoup` object for ``url``.
+
+    The helper now follows redirects and raises an informative error if the
+    request fails.  Returning early when a non-``200`` status code is received
+    prevents downstream parsing functions from silently operating on the
+    "Forbidden" or "Moved" placeholder pages which previously led to completely
+    incorrect data being written to ``data.csv``.
+    """
+
+    response = _session.get(url, allow_redirects=True, timeout=10)
+
+    # ``raise_for_status`` will throw an ``HTTPError`` for 4xx/5xx responses.  We
+    # intentionally let this bubble up so the caller can decide how to handle
+    # failures rather than operating on bad HTML.
+    response.raise_for_status()
+
+    return BeautifulSoup(response.text, "html.parser")
 
 
 def print_progress(
