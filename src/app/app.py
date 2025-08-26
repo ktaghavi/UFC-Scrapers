@@ -44,7 +44,6 @@ df_weight_classes = {
     "Women's Bantamweight": "weight_class_Women_Bantamweight",
     "Women's Featherweight": "weight_class_Women_Featherweight",
     "Catch Weight": "weight_class_CatchWeight",
-    "Open Weight": "weight_class_OpenWeight",
 }
 
 
