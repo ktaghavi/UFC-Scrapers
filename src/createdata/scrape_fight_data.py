@@ -60,8 +60,8 @@ class FightDataScraper:
                 list(old_event_and_fights_data.columns)
             ]
 
-            latest_total_fight_data = pd.concat(
-                [new_event_and_fights_data, old_event_and_fights_data], ignore_index=True
+            latest_total_fight_data = new_event_and_fights_data.append(
+                old_event_and_fights_data, ignore_index=True
             )
             latest_total_fight_data.to_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH, index=None)
 

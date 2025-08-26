@@ -18,18 +18,10 @@ class FighterDetailProcessor:
 
     def _one_hot_encode_win(self):
 
-        win_cols = [
-            "win_by_Decision - Majority",
-            "win_by_Decision - Split",
-            "win_by_Decision - Unanimous",
-            "win_by_KO/TKO",
-            "win_by_Submission",
-            "win_by_TKO - Doctor's Stoppage",
-        ]
-
-        dummies = pd.get_dummies(self.fights["win_by"], prefix="win_by")
-        dummies = dummies.reindex(columns=win_cols, fill_value=0)
-        self.fights = pd.concat([self.fights, dummies], axis=1)
+        self.fights = pd.concat(
+            [self.fights, pd.get_dummies(self.fights["win_by"], prefix="win_by")],
+            axis=1,
+        )
         self.fights.drop(["win_by"], axis=1, inplace=True)
 
     def _get_fighters(self):
@@ -140,18 +132,11 @@ class FighterDetailProcessor:
             for i, index in enumerate(fighter.index):
 
                 fighter_slice = fighter[(i + 1) :].sort_index(ascending=False)
-                # Ensure numerical columns are of numeric dtype before applying
-                # exponential weighted calculations. Some older records may
-                # contain fighter names or other strings which cause pandas to
-                # raise a ``DataError`` when attempting to aggregate. By
-                # coercing errors to ``NaN`` we safely ignore those values and
-                # allow the moving averages to be computed on the remaining
-                # numeric data.
-                numeric_slice = fighter_slice[Numerical_columns].apply(
-                    pd.to_numeric, errors="coerce"
-                )
                 s = (
-                    numeric_slice.ewm(span=3, adjust=False).mean().tail(1)
+                    fighter_slice[Numerical_columns]
+                    .ewm(span=3, adjust=False)
+                    .mean()
+                    .tail(1)
                 )
                 if len(s) != 0:
                     pass
