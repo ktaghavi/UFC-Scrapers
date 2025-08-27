@@ -113,10 +113,10 @@ class Preprocessor:
 
         for column in columns:
             self.fights[column + attempt_suffix] = self.fights[column].apply(
-                lambda X: int(X.split("of")[1])
+                lambda X: int(X.split("of")[1]) if pd.notna(X) and isinstance(X, str) and "of" in X else 0
             )
             self.fights[column + landed_suffix] = self.fights[column].apply(
-                lambda X: int(X.split("of")[0])
+                lambda X: int(X.split("of")[0]) if pd.notna(X) and isinstance(X, str) and "of" in X else 0
             )
 
         self.fights.drop(columns, axis=1, inplace=True)
@@ -128,11 +128,13 @@ class Preprocessor:
         pct_columns = ["R_SIG_STR_pct", "B_SIG_STR_pct", "R_TD_pct", "B_TD_pct"]
 
         def pct_to_frac(X):
-            if X != "---":
-                return float(X.replace("%", "")) / 100
-            else:
-                # if '---' means it's taking pct of `0 of 0`.
-                # Taking a call here to consider 0 landed of 0 attempted as 0 percentage
+            try:
+                if pd.isna(X) or X == "---":
+                    return 0
+                if isinstance(X, str):
+                    return float(X.replace("%", "")) / 100
+                return float(X)
+            except:
                 return 0
 
         for column in pct_columns:
@@ -140,14 +142,18 @@ class Preprocessor:
 
     def _create_title_bout_feature(self):
         self.fights["title_bout"] = self.fights["Fight_type"].apply(
-            lambda X: True if "Title Bout" in X else False
+            lambda X: "Title Bout" in X if pd.notna(X) and isinstance(X, str) else False
         )
 
     def _create_weight_classes(self):
         def make_weight_class(X):
+            # Handle null/NaN values
+            if pd.isna(X) or not isinstance(X, str):
+                return "Open Weight"
+            
             weight_classes = [
                 "Women's Strawweight",
-                "Women's Bantamweight",
+                "Women's Bantamweight", 
                 "Women's Featherweight",
                 "Women's Flyweight",
                 "Lightweight",
@@ -165,7 +171,8 @@ class Preprocessor:
                 if weight_class in X:
                     return weight_class
 
-            if X == "Catch Weight Bout" or "Catchweight Bout":
+            # Fix the logical error in the original condition
+            if X == "Catch Weight Bout" or X == "Catchweight Bout":
                 return "Catch Weight"
             else:
                 return "Open Weight"
@@ -194,27 +201,32 @@ class Preprocessor:
         )
 
     def _convert_last_round_to_seconds(self):
-        # Converting to seconds
         self.fights["last_round_time"] = self.fights["last_round_time"].apply(
-            lambda X: int(X.split(":")[0]) * 60 + int(X.split(":")[1])
+            lambda X: int(X.split(":")[0]) * 60 + int(X.split(":")[1]) 
+            if pd.notna(X) and isinstance(X, str) and ":" in X 
+            else 0
         )
 
     def _convert_CTRL_to_seconds(self):
-        # Converting to seconds
+    # Converting to seconds
         CTRL_columns = ["R_CTRL", "B_CTRL"]
 
         def conv_to_sec(X):
-            if X != "--":
-                return int(X.split(":")[0]) * 60 + int(X.split(":")[1])
-            else:
-                # if '--' means there was no time spent on the ground.
-                # Taking a call here to consider this as 0 seconds
+            try:
+                if pd.isna(X) or not isinstance(X, str):
+                    return 0
+                if X == "--":
+                    return 0
+                # Handle the time conversion
+                parts = X.split(":")
+                if len(parts) == 2:
+                    return int(parts[0]) * 60 + int(parts[1])
+                return 0
+            except (ValueError, AttributeError, IndexError):
                 return 0
 
         for column in CTRL_columns:
-            self.fights[column + "_time(seconds)"] = self.fights[column].apply(
-                conv_to_sec
-            )
+            self.fights[column + "_time(seconds)"] = self.fights[column].apply(conv_to_sec)
 
         # drop original columns
         self.fights.drop(["R_CTRL", "B_CTRL"], axis=1, inplace=True)
@@ -237,7 +249,7 @@ class Preprocessor:
             "1 Rnd (18)": 18 * 60,
             "1 Rnd + OT (15-3)": 15 * 60,
             "1 Rnd (30)": 30 * 60,
-            "1 Rnd + OT (31-5)": 31 * 5,
+            "1 Rnd + OT (31-5)": 31 * 60,  # Fixed: was 31 * 5
             "1 Rnd + OT (27-3)": 27 * 60,
             "1 Rnd + OT (30-3)": 30 * 60,
         }
@@ -248,170 +260,236 @@ class Preprocessor:
         }
 
         def get_total_time(row):
-            if row["Format"] in time_in_first_round.keys():
-                return (row["last_round"] - 1) * time_in_first_round[
-                    row["Format"]
-                ] + row["last_round_time"]
+            try:
+                # Handle missing or invalid data
+                if pd.isna(row["Format"]) or pd.isna(row["last_round"]) or pd.isna(row["last_round_time"]):
+                    return 0
+                    
+                format_val = row["Format"]
+                last_round = row["last_round"]
+                last_round_time = row["last_round_time"]
+                
+                # Ensure numeric values
+                if not isinstance(last_round, (int, float)) or not isinstance(last_round_time, (int, float)):
+                    return 0
+                    
+                if format_val in time_in_first_round:
+                    return (last_round - 1) * time_in_first_round[format_val] + last_round_time
+                    
+                elif format_val in exception_format_time:
+                    if (last_round - 1) >= 2:
+                        return (
+                            exception_format_time[format_val][0]
+                            + (last_round - 2) * exception_format_time[format_val][1]
+                            + last_round_time
+                        )
+                    else:
+                        return (last_round - 1) * exception_format_time[format_val][0] + last_round_time
+                
+                # Default case for unknown formats
+                return 0
+                
+            except (KeyError, TypeError, ValueError):
+                return 0
 
-            elif row["Format"] in exception_format_time.keys():
-
-                if (row["last_round"] - 1) >= 2:
-                    return (
-                        exception_format_time[row["Format"]][0]
-                        + (row["last_round"] - 2)
-                        * exception_format_time[row["Format"]][1]
-                        + row["last_round_time"]
-                    )
-                else:
-                    return (row["last_round"] - 1) * exception_format_time[
-                        row["Format"]
-                    ][0] + row["last_round_time"]
-
-        self.fights["total_time_fought(seconds)"] = self.fights.apply(
-            get_total_time, axis=1
-        )
-        self.fights.drop(
-            ["Format", "Fight_type", "last_round_time"], axis=1, inplace=True
-        )
+        self.fights["total_time_fought(seconds)"] = self.fights.apply(get_total_time, axis=1)
+        
+        # Only drop columns if they exist
+        columns_to_drop = ["Format", "Fight_type", "last_round_time"]
+        existing_columns = [col for col in columns_to_drop if col in self.fights.columns]
+        if existing_columns:
+            self.fights.drop(existing_columns, axis=1, inplace=True)
 
     def _store_compiled_fighter_data_in_another_DF(self):
         store = self.fights.copy()
-        store.drop(
-            [
-                "R_KD",
-                "B_KD",
-                "R_SIG_STR_pct",
-                "B_SIG_STR_pct",
-                "R_TD_pct",
-                "B_TD_pct",
-                "R_SUB_ATT",
-                "B_SUB_ATT",
-                "R_REV",
-                "B_REV",
-                "R_CTRL_time(seconds)",
-                "B_CTRL_time(seconds)",
-                "win_by",
-                "last_round",
-                "R_SIG_STR._att",
-                "R_SIG_STR._landed",
-                "B_SIG_STR._att",
-                "B_SIG_STR._landed",
-                "R_TOTAL_STR._att",
-                "R_TOTAL_STR._landed",
-                "B_TOTAL_STR._att",
-                "B_TOTAL_STR._landed",
-                "R_TD_att",
-                "R_TD_landed",
-                "B_TD_att",
-                "B_TD_landed",
-                "R_HEAD_att",
-                "R_HEAD_landed",
-                "B_HEAD_att",
-                "B_HEAD_landed",
-                "R_BODY_att",
-                "R_BODY_landed",
-                "B_BODY_att",
-                "B_BODY_landed",
-                "R_LEG_att",
-                "R_LEG_landed",
-                "B_LEG_att",
-                "B_LEG_landed",
-                "R_DISTANCE_att",
-                "R_DISTANCE_landed",
-                "B_DISTANCE_att",
-                "B_DISTANCE_landed",
-                "R_CLINCH_att",
-                "R_CLINCH_landed",
-                "B_CLINCH_att",
-                "B_CLINCH_landed",
-                "R_GROUND_att",
-                "R_GROUND_landed",
-                "B_GROUND_att",
-                "B_GROUND_landed",
-                "total_time_fought(seconds)",
-            ],
-            axis=1,
-            inplace=True,
-        )
+        
+        # Only drop columns that exist in the DataFrame
+        columns_to_drop = [
+            "R_KD", "B_KD", "R_SIG_STR_pct", "B_SIG_STR_pct", "R_TD_pct", "B_TD_pct",
+            "R_SUB_ATT", "B_SUB_ATT", "R_REV", "B_REV", "R_CTRL_time(seconds)", "B_CTRL_time(seconds)",
+            "win_by", "last_round", "R_SIG_STR._att", "R_SIG_STR._landed", "B_SIG_STR._att", "B_SIG_STR._landed",
+            "R_TOTAL_STR._att", "R_TOTAL_STR._landed", "B_TOTAL_STR._att", "B_TOTAL_STR._landed",
+            "R_TD_att", "R_TD_landed", "B_TD_att", "B_TD_landed", "R_HEAD_att", "R_HEAD_landed",
+            "B_HEAD_att", "B_HEAD_landed", "R_BODY_att", "R_BODY_landed", "B_BODY_att", "B_BODY_landed",
+            "R_LEG_att", "R_LEG_landed", "B_LEG_att", "B_LEG_landed", "R_DISTANCE_att", "R_DISTANCE_landed",
+            "B_DISTANCE_att", "B_DISTANCE_landed", "R_CLINCH_att", "R_CLINCH_landed", "B_CLINCH_att", "B_CLINCH_landed",
+            "R_GROUND_att", "R_GROUND_landed", "B_GROUND_att", "B_GROUND_landed", "total_time_fought(seconds)",
+        ]
+        
+        existing_columns = [col for col in columns_to_drop if col in store.columns]
+        if existing_columns:
+            store.drop(existing_columns, axis=1, inplace=True)
+        
         return store
 
     def _create_winner_feature(self):
         def get_renamed_winner(row):
-            if row["R_fighter"] == row["Winner"]:
-                return "Red"
+            try:
+                # Handle missing values
+                if pd.isna(row["R_fighter"]) or pd.isna(row["B_fighter"]) or pd.isna(row["Winner"]):
+                    return "Unknown"
+                    
+                r_fighter = str(row["R_fighter"]).strip()
+                b_fighter = str(row["B_fighter"]).strip()
+                winner = str(row["Winner"]).strip()
+                
+                if r_fighter == winner:
+                    return "Red"
+                elif b_fighter == winner:
+                    return "Blue"
+                elif winner.lower() == "draw":
+                    return "Draw"
+                else:
+                    return "Unknown"
+                    
+            except (AttributeError, KeyError):
+                return "Unknown"
 
-            elif row["B_fighter"] == row["Winner"]:
-                return "Blue"
-
-            elif row["Winner"] == "Draw":
-                return "Draw"
-
-        self.store["Winner"] = self.store[["R_fighter", "B_fighter", "Winner"]].apply(
-            get_renamed_winner, axis=1
-        )
+        # Ensure the columns exist before applying
+        required_columns = ["R_fighter", "B_fighter", "Winner"]
+        if all(col in self.store.columns for col in required_columns):
+            self.store["Winner"] = self.store[required_columns].apply(get_renamed_winner, axis=1)
 
     def _create_fighter_attributes(self):
-        frame = FighterDetailProcessor(self.fights, self.fighter_details).frame
-        self.store = self.store.join(frame, how="outer")
-
+        """
+        Create fighter attributes by joining with fighter details data
+        """
+        try:
+            # Create a mapping of fighter names to their attributes
+            fighter_attrs = self.fighter_details.copy()
+            
+            # Create separate DataFrames for Red and Blue fighters
+            red_attrs = fighter_attrs.add_prefix('R_')
+            blue_attrs = fighter_attrs.add_prefix('B_')
+            
+            # Merge with the store DataFrame
+            self.store = self.store.merge(
+                red_attrs, 
+                left_on='R_fighter', 
+                right_index=True, 
+                how='left'
+            )
+            
+            self.store = self.store.merge(
+                blue_attrs, 
+                left_on='B_fighter', 
+                right_index=True, 
+                how='left'
+            )
+            
+            print("Successfully created fighter attributes")
+            
+        except Exception as e:
+            print(f"Warning: Could not create fighter attributes: {e}")
+            # Continue without fighter attributes if there's an issue
+    
     def _create_fighter_age(self):
-        self.store["R_DOB"] = pd.to_datetime(self.store["R_DOB"])
-        self.store["B_DOB"] = pd.to_datetime(self.store["B_DOB"])
-        self.store["date"] = pd.to_datetime(self.store["date"])
+        try:
+            # Convert to datetime with error handling
+            self.store["R_DOB"] = pd.to_datetime(self.store["R_DOB"], errors='coerce')
+            self.store["B_DOB"] = pd.to_datetime(self.store["B_DOB"], errors='coerce')
+            self.store["date"] = pd.to_datetime(self.store["date"], errors='coerce')
 
-        def get_age(row):
-            B_age = (row["date"] - row["B_DOB"]).days
-            R_age = (row["date"] - row["R_DOB"]).days
+            def get_age(row):
+                try:
+                    # Handle missing dates
+                    if pd.isna(row["date"]) or pd.isna(row["B_DOB"]) or pd.isna(row["R_DOB"]):
+                        return pd.Series([np.nan, np.nan], index=["B_age", "R_age"])
+                    
+                    fight_date = row["date"]
+                    b_dob = row["B_DOB"]
+                    r_dob = row["R_DOB"]
+                    
+                    # Calculate ages
+                    b_age = (fight_date - b_dob).days
+                    r_age = (fight_date - r_dob).days
+                    
+                    # Convert to years, handle negative ages
+                    if not pd.isna(b_age) and b_age >= 0:
+                        b_age = math.floor(b_age / 365.25)
+                    else:
+                        b_age = np.nan
+                        
+                    if not pd.isna(r_age) and r_age >= 0:
+                        r_age = math.floor(r_age / 365.25)
+                    else:
+                        r_age = np.nan
 
-            if np.isnan(B_age) != True:
-                B_age = math.floor(B_age / 365.25)
+                    return pd.Series([b_age, r_age], index=["B_age", "R_age"])
+                    
+                except Exception:
+                    return pd.Series([np.nan, np.nan], index=["B_age", "R_age"])
 
-            if np.isnan(R_age) != True:
-                R_age = math.floor(R_age / 365.25)
-
-            return pd.Series([B_age, R_age], index=["B_age", "R_age"])
-
-        self.store[["B_age", "R_age"]] = self.store[["date", "R_DOB", "B_DOB"]].apply(
-            get_age, axis=1
-        )
-        self.store.drop(["R_DOB", "B_DOB"], axis=1, inplace=True)
-
-    def _save(self, filepath):
-        self.store.to_csv(filepath, index=False)
+            # Only apply if required columns exist
+            required_columns = ["date", "R_DOB", "B_DOB"]
+            if all(col in self.store.columns for col in required_columns):
+                self.store[["B_age", "R_age"]] = self.store[required_columns].apply(get_age, axis=1)
+                
+                # Drop original DOB columns if they exist
+                dob_columns = ["R_DOB", "B_DOB"]
+                existing_dob_columns = [col for col in dob_columns if col in self.store.columns]
+                if existing_dob_columns:
+                    self.store.drop(existing_dob_columns, axis=1, inplace=True)
+                    
+        except Exception as e:
+            print(f"Warning: Could not create fighter age features: {e}")
 
     def _fill_nas(self):
-        self.store["R_Reach_cms"].fillna(self.store["R_Height_cms"], inplace=True)
-        self.store["B_Reach_cms"].fillna(self.store["B_Height_cms"], inplace=True)
+        try:
+            # Fill reach with height if missing
+            if "R_Reach_cms" in self.store.columns and "R_Height_cms" in self.store.columns:
+                self.store["R_Reach_cms"].fillna(self.store["R_Height_cms"], inplace=True)
+            if "B_Reach_cms" in self.store.columns and "B_Height_cms" in self.store.columns:
+                self.store["B_Reach_cms"].fillna(self.store["B_Height_cms"], inplace=True)
 
-        # Select numeric columns (excluding the 'total_time_fought(seconds)' column)
-        numeric_columns = self.store.select_dtypes(include=np.number).columns
-        numeric_columns = numeric_columns[numeric_columns != 'total_time_fought(seconds)']
+            # Select numeric columns (excluding specific columns)
+            numeric_columns = self.store.select_dtypes(include=np.number).columns
+            exclude_columns = ['total_time_fought(seconds)']
+            numeric_columns = [col for col in numeric_columns if col not in exclude_columns]
 
-        # Fill NaN values for numeric columns using median
-        self.store[numeric_columns] = self.store[numeric_columns].fillna(self.store[numeric_columns].median())
+            # Fill NaN values for numeric columns using median
+            if numeric_columns:
+                self.store[numeric_columns] = self.store[numeric_columns].fillna(self.store[numeric_columns].median())
 
-        self.store["R_Stance"].fillna("Orthodox", inplace=True)
-        self.store["B_Stance"].fillna("Orthodox", inplace=True)
+            # Fill stance columns
+            if "R_Stance" in self.store.columns:
+                self.store["R_Stance"].fillna("Orthodox", inplace=True)
+            if "B_Stance" in self.store.columns:
+                self.store["B_Stance"].fillna("Orthodox", inplace=True)
+                
+        except Exception as e:
+            print(f"Warning: Could not fill all NaN values: {e}")
 
     def _drop_non_essential_cols(self):
-        self.store.drop(self.store.index[self.store["Winner"] == "Draw"], inplace=True)
-        self.store = pd.concat(
-            [
-                self.store,
-                pd.get_dummies(self.store[["weight_class", "B_Stance", "R_Stance"]]),
-            ],
-            axis=1,
-        )
-        self.store.drop(
-            columns=[
-                "weight_class",
-                "B_Stance",
-                "R_Stance",
-                "Referee",
-                "location",
-                "date",
-                "R_fighter",
-                "B_fighter",
-            ],
-            inplace=True,
-        )
+        try:
+            # Remove draws if Winner column exists
+            if "Winner" in self.store.columns:
+                self.store.drop(self.store.index[self.store["Winner"] == "Draw"], inplace=True)
+            
+            # Create dummy variables for categorical columns that exist
+            categorical_columns = ["weight_class", "B_Stance", "R_Stance"]
+            existing_categorical = [col for col in categorical_columns if col in self.store.columns]
+            
+            if existing_categorical:
+                dummies = pd.get_dummies(self.store[existing_categorical])
+                self.store = pd.concat([self.store, dummies], axis=1)
+            
+            # Drop original columns if they exist
+            columns_to_drop = [
+                "weight_class", "B_Stance", "R_Stance", "Referee", 
+                "location", "date", "R_fighter", "B_fighter"
+            ]
+            existing_columns = [col for col in columns_to_drop if col in self.store.columns]
+            if existing_columns:
+                self.store.drop(columns=existing_columns, inplace=True)
+                
+        except Exception as e:
+            print(f"Warning: Could not drop all non-essential columns: {e}")
+
+    def _save(self, filepath):
+        try:
+            self.store.to_csv(filepath, index=False)
+            print(f"Successfully saved data to {filepath}")
+        except Exception as e:
+            print(f"Error saving file: {e}")
+            raise
